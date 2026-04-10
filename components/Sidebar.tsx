@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
 import {
   HeartPulse, LayoutDashboard, User,
   Activity, Brain, Map, Wind, Watch, Scale, LogIn, LogOut
@@ -18,6 +19,12 @@ const NAV = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    setIsLoggedIn(!!localStorage.getItem("userId"));
+  }, []);
+
   return (
     <aside style={{
       position: "fixed", left: 0, top: 0,
@@ -93,7 +100,7 @@ export default function Sidebar() {
         </div>
         
         {/* Logout Button if logged in */}
-        {typeof window !== "undefined" && localStorage.getItem("userId") && (
+        {isLoggedIn && (
           <button 
             onClick={() => {
               localStorage.removeItem("userId");
