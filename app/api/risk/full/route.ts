@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "edge";
-
 function predictRisk(payload: any) {
   const {
     pm25 = 0, pm10 = 0, no2 = 0, o3 = 0, co = 0,

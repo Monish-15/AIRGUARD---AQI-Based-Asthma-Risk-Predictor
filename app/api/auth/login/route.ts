@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "edge";
-
-// Serverless auth using signed JWT-like tokens (no DB needed)
-// Uses a simple deterministic approach safe for demo/mini-project use.
-
+// Demo user — no database needed for mini-project
 const DEMO_USERS: Record<string, any> = {
   "demo@airguard.app": {
     id: 1,
@@ -17,26 +13,28 @@ const DEMO_USERS: Record<string, any> = {
   },
 };
 
-function makeToken(userId: number, email: string) {
-  // Simple base64 token — sufficient for a mini-project demo
+function makeToken(userId: number, email: string): string {
   const payload = JSON.stringify({ userId, email, exp: Date.now() + 86400000 });
-  return Buffer.from(payload).toString("base64");
+  // btoa works in Node.js 16+ and all edge/browser environments
+  return btoa(unescape(encodeURIComponent(payload)));
 }
 
 export async function POST(req: NextRequest) {
   try {
     const { email, password } = await req.json();
+    const user = DEMO_USERS[email?.toLowerCase?.()];
 
-    // Check demo user
-    const user = DEMO_USERS[email?.toLowerCase()];
     if (!user || user.password !== password) {
-      return NextResponse.json({ detail: "Invalid email or password." }, { status: 401 });
+      return NextResponse.json(
+        { detail: "Invalid email or password." },
+        { status: 401 }
+      );
     }
 
     const token = makeToken(user.id, user.email);
-    const { password: _, ...safeUser } = user;
+    const { password: _p, ...safeUser } = user;
     return NextResponse.json({ token, user: safeUser });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json({ detail: "Login failed." }, { status: 400 });
   }
 }

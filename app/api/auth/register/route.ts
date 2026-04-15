@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "edge";
+let userIdCounter = 100;
 
-let userIdCounter = 100; // In-memory counter (resets on cold start, fine for demo)
-
-function makeToken(userId: number, email: string) {
+function makeToken(userId: number, email: string): string {
   const payload = JSON.stringify({ userId, email, exp: Date.now() + 86400000 });
-  return Buffer.from(payload).toString("base64");
+  return btoa(unescape(encodeURIComponent(payload)));
 }
 
 export async function POST(req: NextRequest) {
@@ -15,11 +13,12 @@ export async function POST(req: NextRequest) {
     const { email, password, name } = body;
 
     if (!email || !password || !name) {
-      return NextResponse.json({ detail: "name, email, and password are required." }, { status: 422 });
+      return NextResponse.json(
+        { detail: "name, email, and password are required." },
+        { status: 422 }
+      );
     }
 
-    // For a serverless mini project, we just return a success response
-    // In production you'd store in a database (e.g., PlanetScale, Supabase)
     const userId = ++userIdCounter;
     const token = makeToken(userId, email);
 
@@ -34,7 +33,7 @@ export async function POST(req: NextRequest) {
         age: body.age ?? null,
       },
     });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json({ detail: "Registration failed." }, { status: 400 });
   }
 }

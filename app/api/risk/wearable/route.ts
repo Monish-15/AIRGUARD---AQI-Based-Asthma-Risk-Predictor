@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "edge";
-
 /**
  * Pure-JS asthma risk model (replaces the Python/sklearn backend).
  * Weights derived from typical epidemiological significance.
