@@ -1,4 +1,6 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:800";
+// Use relative URLs so API calls work on both Vercel and local dev.
+// If you set NEXT_PUBLIC_API_URL in Vercel env vars, that takes priority.
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 function getAuthHeaders() {
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;

@@ -27,22 +27,22 @@ export default function LoginPage() {
       if (isLogin) {
         // Success Login
         const res = await loginUser({ email: form.email, password: form.password });
-        localStorage.setItem("userId", res.user_id);
-        localStorage.setItem("token", res.access_token);
-        localStorage.setItem("userName", res.name);
-        
+        localStorage.setItem("userId", String(res.user?.id ?? res.user_id ?? ""));
+        localStorage.setItem("token", res.token ?? res.access_token ?? "");
+        localStorage.setItem("userName", res.user?.name ?? res.name ?? "");
+
         // Visual feedback before redirect
         setError({ msg: "Login successful! Redirecting...", type: "success" });
         setTimeout(() => router.push("/"), 800);
       } else {
         // Registration
         const res = await registerUser(form);
-        
+
         // Use the token returned by registration immediately
-        localStorage.setItem("userId", String(res.user_id));
-        localStorage.setItem("token", res.access_token);
-        localStorage.setItem("userName", res.name);
-        
+        localStorage.setItem("userId", String(res.user?.id ?? res.user_id ?? ""));
+        localStorage.setItem("token", res.token ?? res.access_token ?? "");
+        localStorage.setItem("userName", res.user?.name ?? res.name ?? form.name);
+
         setError({ msg: "Account created! Welcome to AirGuard.", type: "success" });
         setTimeout(() => router.push("/"), 1200);
       }
