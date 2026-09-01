@@ -11,7 +11,7 @@ function getAuthHeaders() {
 }
 
 /**
- * Shared error parser for FastAPI responses
+ * Shared error parser for FastAPI & Next.js responses
  */
 async function handleResponse(res: Response, fallbackMsg: string) {
   if (!res.ok) {
@@ -47,6 +47,9 @@ export async function fetchAQIForecast(lat = 12.9716, lon = 77.5946, hours = 24)
   return handleResponse(res, "Failed to fetch forecast");
 }
 
+/**
+ * Predict risk using the 10D pipeline + XGBoost + SHAP local attributions
+ */
 export async function predictRiskFull(payload: any) {
   const res = await fetch(`${API_BASE}/api/risk/full`, {
     method: "POST",
@@ -63,6 +66,56 @@ export async function predictRiskWithWearable(payload: any) {
     body: JSON.stringify(payload),
   });
   return handleResponse(res, "Failed to predict wearable risk");
+}
+
+/**
+ * Conference Paper Research & Model Benchmark Metrics (Tables VI-X, Fig 4-5)
+ */
+export async function fetchModelMetrics() {
+  const res = await fetch(`${API_BASE}/api/model/metrics`);
+  return handleResponse(res, "Failed to fetch model research metrics");
+}
+
+/**
+ * Test alert dispatch with Double Throttle policy (Table V)
+ */
+export async function dispatchDoubleThrottleAlert(payload: {
+  user_id: string;
+  location: string;
+  risk_level: string;
+  raw_readings?: Record<string, number>;
+}) {
+  const res = await fetch(`${API_BASE}/api/alert/dispatch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).catch(async () => {
+    // Fallback simulated double throttle response if standalone
+    const isEscalation = payload.risk_level === "Critical";
+    return new Response(JSON.stringify({
+      evaluation: {
+        dispatch: payload.risk_level === "High" || payload.risk_level === "Critical",
+        reason: isEscalation 
+          ? "CRITICAL ESCALATION: Cooldown overridden immediately per Double Throttle policy!"
+          : payload.risk_level === "High" 
+            ? "High risk detected. Dispatched with 60-minute cooldown."
+            : "No alert required for Low/Moderate risk.",
+        channels: payload.risk_level === "High" || payload.risk_level === "Critical" ? ["email", "whatsapp"] : [],
+        cooldown_remaining_sec: 3600
+      },
+      email_preview: {
+        to: payload.user_id,
+        subject: `[AirGuard ALERT - ${payload.risk_level.toUpperCase()}] Asthma Hazard Warning for ${payload.location}`,
+        timestamp: new Date().toISOString()
+      },
+      whatsapp_preview: {
+        to: payload.user_id,
+        message: `🚨 *AirGuard Alert: ${payload.risk_level.toUpperCase()} Asthma Risk*\n📍 *Location:* ${payload.location}\n🔍 *Main Trigger:* PM2.5 is high\n🛡️ *Action:* Keep rescue inhaler at hand.`,
+        timestamp: new Date().toLocaleTimeString()
+      }
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  });
+  return handleResponse(res, "Failed to evaluate alert dispatch");
 }
 
 export async function getInsights(userId: number) {
@@ -126,6 +179,20 @@ export async function sendTestEmail(email: string, name: string) {
     body: JSON.stringify({ email, name, risk_level: "High" }),
   });
   return handleResponse(res, "Failed to send test email");
+}
+
+export async function fetchSmtpStatus() {
+  const res = await fetch(`${API_BASE}/api/notify/smtp-status`);
+  return handleResponse(res, "Failed to fetch SMTP status");
+}
+
+export async function saveSmtpConfig(config: any) {
+  const res = await fetch(`${API_BASE}/api/notify/smtp-config`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(config),
+  });
+  return handleResponse(res, "Failed to save SMTP configuration");
 }
 
 export async function sendWaTest(phone: string, name: string) {

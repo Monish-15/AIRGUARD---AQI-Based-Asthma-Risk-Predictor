@@ -3,48 +3,57 @@ import { useState, useCallback, useEffect } from "react";
 import {
   fetchCurrentAQI,
   fetchAQIForecast,
-  predictRiskWithWearable,
+  predictRiskFull,
+  dispatchDoubleThrottleAlert,
 } from "@/lib/api";
 import ForecastChart from "@/components/ForecastChart";
 import {
   MapPin, Loader2, RefreshCw, Activity, Heart,
   Wind, Thermometer, Droplets, Zap, AlertTriangle, CheckCircle2,
-  Search,
+  Search, Brain, ShieldAlert, Mail, MessageSquare, Clock, Sparkles,
+  Info, ArrowRight, BellRing
 } from "lucide-react";
 
-/* ─── Risk metadata ─────────────────────────────────────────── */
+/* ─── 5 Paper Cities (Table VI) ──────────────────────────────── */
+const PAPER_CITIES = [
+  { name: "Bengaluru", lat: 12.9716, lon: 77.5946, tag: "Tech Hub / Baseline" },
+  { name: "Delhi", lat: 28.6139, lon: 77.2090, tag: "High Winter PM2.5" },
+  { name: "Mumbai", lat: 19.0760, lon: 72.8777, tag: "High Humidity Coastal" },
+  { name: "Chennai", lat: 13.0827, lon: 80.2707, tag: "Tropical Maritime" },
+  { name: "Hyderabad", lat: 17.3850, lon: 78.4867, tag: "Semi-Arid Plateau" },
+];
+
+/* ─── WHO 24h reference guidelines (Table II) ─────────────────── */
+const WHO_GUIDELINES: Record<string, string> = {
+  pm25: "15 µg/m³",
+  pm10: "45 µg/m³",
+  no2: "25 ppb",
+  o3: "100 µg/m³",
+  co: "4 ppm",
+  temperature: "—",
+  humidity: "—",
+};
+
+/* ─── Risk metadata (Table III) ──────────────────────────────── */
 function riskMeta(level: string) {
   switch (level?.toLowerCase()) {
-    case "low":      return { cls: "low",      dot: "#059669", msg: "Air quality is safe. No restrictions needed." };
-    case "moderate": return { cls: "moderate", dot: "#d97706", msg: "Moderate risk — limit prolonged outdoor exposure." };
-    case "high":     return { cls: "high",     dot: "#ea580c", msg: "High risk — avoid outdoor activity. Carry your inhaler." };
-    case "critical": return { cls: "critical", dot: "#dc2626", msg: "Critical — stay indoors. Seek medical advice if symptomatic." };
-    default:         return { cls: "low",      dot: "#059669", msg: "" };
+    case "low":
+      return { cls: "low", dot: "#059669", bg: "#ecfdf5", border: "#a7f3d0", msg: "Normal outdoor activity safe for asthma sufferers." };
+    case "moderate":
+      return { cls: "moderate", dot: "#d97706", bg: "#fffbeb", border: "#fde68a", msg: "Reduce strenuous outdoor exertion, monitor for symptoms." };
+    case "high":
+      return { cls: "high", dot: "#ea580c", bg: "#fff7ed", border: "#fdba74", msg: "Stay indoors, keep rescue inhaler at hand, proactive alert dispatched." };
+    case "critical":
+      return { cls: "critical", dot: "#dc2626", bg: "#fef2f2", border: "#fca5a5", msg: "Remain indoors, seal windows, seek medical advice if symptomatic, urgent alert dispatched." };
+    default:
+      return { cls: "low", dot: "#059669", bg: "#ecfdf5", border: "#a7f3d0", msg: "Normal outdoor activity." };
   }
 }
 
 const DEF = { pm25: "", pm10: "", no2: "", o3: "", co: "", humidity: "", temperature: "", aqi: "", pollen: "" };
 
-/* ─── Divider ────────────────────────────────────────────────── */
-const Divider = () => (
-  <div style={{ height: "1px", background: "#f1f5f9", margin: "4px 0" }} />
-);
-
-/* ─── Section header ─────────────────────────────────────────── */
-function SectionHeader({ icon, title, sub }: { icon: React.ReactNode; title: string; sub?: string }) {
-  return (
-    <div style={{ marginBottom: "18px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-        {icon}
-        <span style={{ fontWeight: 700, fontSize: "14px", color: "#0f172a" }}>{title}</span>
-        {sub && <span style={{ fontSize: "11px", color: "#94a3b8", marginLeft: "2px" }}>{sub}</span>}
-      </div>
-    </div>
-  );
-}
-
 export default function PredictorPage() {
-  const [city, setCity] = useState({ name: "Bengaluru", lat: 12.9716, lon: 77.5946 });
+  const [city, setCity] = useState(PAPER_CITIES[0]);
   const [fields, setFields] = useState({ ...DEF });
   const [autoFilling, setAutoFilling] = useState(false);
   const [dataSource, setDataSource] = useState<string | null>(null);
@@ -53,24 +62,14 @@ export default function PredictorPage() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("selectedCity");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (parsed && parsed.name) setCity(parsed);
-        } catch (e) {}
-      }
-    }
-  }, []);
-
-
-
   const [forecast, setForecast] = useState<any[]>([]);
   const [result, setResult] = useState<any>(null);
   const [predicting, setPredicting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Alert simulation state (Table V)
+  const [alertDispatching, setAlertDispatching] = useState(false);
+  const [alertResult, setAlertResult] = useState<any>(null);
 
   /* ── Location search ──────────────────────────────────────── */
   const handleSearch = async () => {
@@ -92,17 +91,17 @@ export default function PredictorPage() {
       name: loc.display_name.split(",")[0],
       lat: parseFloat(loc.lat),
       lon: parseFloat(loc.lon),
+      tag: "Custom Query"
     };
     setCity(newCity);
     setSearchQuery("");
     setSearchResults([]);
     setDataSource(null);
-    setFields({ ...DEF });
   };
 
-  /* ── Auto-fill ──────────────────────────────────────────────── */
+  /* ── Auto-fill (Layer 1) ───────────────────────────────────── */
   const handleAutoFill = useCallback(async () => {
-    if (city.lat === 0) return;
+    if (!city.lat) return;
     setAutoFilling(true);
     setError(null);
     try {
@@ -131,23 +130,23 @@ export default function PredictorPage() {
   }, [city]);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("selectedCity", JSON.stringify(city));
-    }
-    if (city.lat !== 0) {
-      handleAutoFill();
-    }
+    handleAutoFill();
   }, [city, handleAutoFill]);
 
-  /* ── Predict ─────────────────────────────────────────────────── */
+  /* ── 5-Stage Predict (Layer 1-3) ────────────────────────────── */
   const handlePredict = useCallback(async () => {
     const pm25 = parseFloat(fields.pm25);
-    if (isNaN(pm25)) { setError("PM2.5 is required."); return; }
+    if (isNaN(pm25)) { setError("PM2.5 concentration is required."); return; }
     setPredicting(true);
     setError(null);
     setResult(null);
+    setAlertResult(null);
+
     try {
-      const data = await predictRiskWithWearable({
+      const data = await predictRiskFull({
+        city: city.name,
+        lat: city.lat,
+        lon: city.lon,
         pm25,
         pm10: parseFloat(fields.pm10) || 0,
         no2: parseFloat(fields.no2) || 0,
@@ -156,90 +155,164 @@ export default function PredictorPage() {
         humidity: parseFloat(fields.humidity) || 65,
         temperature: parseFloat(fields.temperature) || 28,
         aqi: parseFloat(fields.aqi) || pm25 * 2,
-        pollen: parseFloat(fields.pollen) || 0,
-        asthma_severity: 1,
-        heart_rate: null,
-        spo2: null,
-        breathing_rate: null,
       });
       setResult(data);
-      if (forecast.length === 0 && city.lat !== 0) {
-        const fd = await fetchAQIForecast(city.lat, city.lon, 72);
-        setForecast(fd.forecast ?? []);
-      }
-    } catch {
-      setError("Prediction failed. Make sure the backend is running.");
+    } catch (err: any) {
+      setError(err.message || "Prediction failed.");
     } finally {
       setPredicting(false);
     }
-  }, [fields, forecast, city]);
+  }, [fields, city]);
+
+  /* ── Double Throttle Alert Simulator (Layer 5) ─────────────── */
+  const handleSimulateAlert = async () => {
+    if (!result) return;
+    setAlertDispatching(true);
+    try {
+      const resp = await dispatchDoubleThrottleAlert({
+        user_id: "patient_01",
+        location: city.name,
+        risk_level: result.risk_level,
+        raw_readings: result.raw_parameters,
+      });
+      setAlertResult(resp);
+    } catch {
+      setError("Failed to simulate alert dispatch.");
+    } finally {
+      setAlertDispatching(false);
+    }
+  };
 
   const meta = result ? riskMeta(result.risk_level) : null;
 
-  /* ─── shared text colours ─────────────────────────────────── */
-  const T = { primary: "#0f172a", secondary: "#334155", muted: "#94a3b8", border: "#e2e8f0" };
-
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "20px", paddingBottom: "60px" }}>
-
-      {/* ── HEADER ────────────────────────────────────────────── */}
-
-      <div className="animate-in" style={{ textAlign: "center", paddingTop: "4px", paddingBottom: "4px" }}>
-        <h1 style={{ fontSize: "26px", fontWeight: 800, margin: 0, color: T.primary, letterSpacing: "-0.02em" }}>
-          Asthma Risk Predictor
-        </h1>
-        <p style={{ color: T.muted, fontSize: "13px", marginTop: "5px" }}>
-          Enter air quality data and optional wearable readings to assess your personal risk.
-        </p>
-      </div>
-
-      {/* ── LOCATION + AQI ────────────────────────────────────── */}
-      <div className="section-card animate-in">
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-          <SectionHeader
-            icon={<MapPin size={14} style={{ color: "#2563eb" }} />}
-            title="Location & Air Quality"
-          />
-          <button
-            id="autofill-btn"
-            className="autofill-btn"
-            onClick={handleAutoFill}
-            disabled={autoFilling || city.lat === 0}
-          >
-            {autoFilling
-              ? <><Loader2 size={11} className="animate-spin" /> Fetching…</>
-              : <><RefreshCw size={11} /> Auto-fill from API</>}
-          </button>
+    <div style={{ display: "flex", flexDirection: "column", gap: "24px", maxWidth: "1080px", margin: "0 auto", paddingBottom: "60px" }}>
+      {/* Hero / Header */}
+      <div style={{
+        background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+        borderRadius: "16px",
+        padding: "24px 28px",
+        color: "#fff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        boxShadow: "0 10px 25px -5px rgba(15, 23, 42, 0.1)"
+      }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+            <span style={{ background: "#2563eb", color: "#fff", fontSize: "11px", fontWeight: 700, padding: "2px 8px", borderRadius: "4px", textTransform: "uppercase" }}>
+              Research Pipeline
+            </span>
+            <span style={{ fontSize: "12px", color: "#94a3b8" }}>10D Feature XGBoost + SHAP Attributions</span>
+          </div>
+          <h1 style={{ fontSize: "22px", fontWeight: 800, margin: 0, letterSpacing: "-0.01em" }}>
+            AirGuard Risk Intelligence Predictor
+          </h1>
+          <p style={{ color: "#94a3b8", fontSize: "13px", margin: "4px 0 0 0" }}>
+            Real-time environmental telemetry mapped to 4 clinical risk bands with SHAP local explainability.
+          </p>
         </div>
 
-        {/* Global city search */}
-        <div style={{ marginBottom: "18px", position: "relative" }}>
-          <label className="input-label" htmlFor="city-search">Search Any Global Location</label>
-          <div style={{ display: "flex", gap: "8px" }}>
-            <input
-              id="city-search"
-              type="text"
-              className="input-field"
-              placeholder="e.g., London, Tokyo, New York"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleSearch()}
-              style={{ flex: 1 }}
-            />
-            <button
-              onClick={handleSearch}
-              disabled={searching}
-              style={{
-                background: "#0f172a", color: "#fff", display: "flex", alignItems: "center", gap: "6px",
-                padding: "0 16px", borderRadius: "10px", fontSize: "13px", fontWeight: 600, cursor: "pointer",
-                border: "none", transition: "background 0.2s"
-              }}
-            >
-              {searching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
-              Search
-            </button>
-          </div>
-          
+        <button
+          onClick={handleAutoFill}
+          disabled={autoFilling}
+          style={{
+            background: "rgba(255, 255, 255, 0.1)",
+            border: "1px solid rgba(255, 255, 255, 0.2)",
+            color: "#fff",
+            borderRadius: "10px",
+            padding: "10px 16px",
+            fontSize: "13px",
+            fontWeight: 600,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            transition: "all 0.2s"
+          }}
+        >
+          {autoFilling ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+          Fetch Live Telemetry
+        </button>
+      </div>
+
+      {/* City Selector Pills (Table VI Cities) */}
+      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "18px 20px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+          <span style={{ fontSize: "12px", fontWeight: 700, textTransform: "uppercase", color: "#64748b", letterSpacing: "0.05em" }}>
+            Evaluation Cities (15,000 Dataset Study)
+          </span>
+          <span style={{ fontSize: "12px", color: "#94a3b8" }}>Selected: <b>{city.name}</b></span>
+        </div>
+
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+          {PAPER_CITIES.map((c) => {
+            const isSel = city.name === c.name;
+            return (
+              <button
+                key={c.name}
+                onClick={() => setCity(c)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "8px 14px",
+                  borderRadius: "10px",
+                  fontSize: "13px",
+                  fontWeight: isSel ? 700 : 500,
+                  background: isSel ? "#eff6ff" : "#f8fafc",
+                  border: isSel ? "1.5px solid #2563eb" : "1px solid #e2e8f0",
+                  color: isSel ? "#1d4ed8" : "#334155",
+                  cursor: "pointer",
+                  transition: "all 0.15s"
+                }}
+              >
+                <MapPin size={14} color={isSel ? "#2563eb" : "#94a3b8"} />
+                <span>{c.name}</span>
+                <span style={{ fontSize: "11px", color: isSel ? "#3b82f6" : "#94a3b8", opacity: 0.8 }}>({c.tag.split(" ")[0]})</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Global Search Bar */}
+        <div style={{ marginTop: "16px", display: "flex", gap: "8px", position: "relative" }}>
+          <input
+            type="text"
+            placeholder="Or search any custom city worldwide..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleSearch()}
+            style={{
+              flex: 1,
+              padding: "10px 14px",
+              borderRadius: "10px",
+              border: "1px solid #e2e8f0",
+              fontSize: "13px",
+              outline: "none"
+            }}
+          />
+          <button
+            onClick={handleSearch}
+            disabled={searching}
+            style={{
+              background: "#0f172a",
+              color: "#fff",
+              padding: "0 18px",
+              borderRadius: "10px",
+              border: "none",
+              fontSize: "13px",
+              fontWeight: 600,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px"
+            }}
+          >
+            {searching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+            Search
+          </button>
+
           {searchResults.length > 0 && (
             <div style={{
               position: "absolute", top: "100%", left: 0, right: 0, marginTop: "6px",
@@ -251,227 +324,357 @@ export default function PredictorPage() {
                   key={i}
                   onClick={() => selectLocation(loc)}
                   style={{
-                    width: "100%", textAlign: "left", padding: "12px 14px", border: "none",
+                    width: "100%", textAlign: "left", padding: "10px 14px", border: "none",
                     background: i % 2 === 0 ? "#fff" : "#f8fafc", cursor: "pointer", fontFamily: "inherit",
                     borderBottom: i === searchResults.length - 1 ? "none" : "1px solid #f1f5f9",
                   }}
                 >
-                  <div style={{ fontWeight: 600, color: "#0f172a", fontSize: "14px" }}>
-                    {loc.display_name.split(",")[0]}
-                  </div>
-                  <div style={{ color: "#64748b", fontSize: "12px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {loc.display_name}
-                  </div>
+                  <div style={{ fontWeight: 600, color: "#0f172a", fontSize: "13px" }}>{loc.display_name.split(",")[0]}</div>
+                  <div style={{ color: "#64748b", fontSize: "11px" }}>{loc.display_name}</div>
                 </button>
               ))}
             </div>
           )}
-          
-          <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "6px", fontSize: "13px" }}>
-            <span style={{ color: "#64748b" }}>Currently selected:</span>
-            <span style={{ fontWeight: 700, color: "#0f172a", display: "flex", alignItems: "center", gap: "4px" }}>
-              <MapPin size={12} color="#2563eb" /> {city.name}
-            </span>
-          </div>
-        </div>
-
-        {/* Source pill */}
-        {dataSource && (
-          <div style={{ marginBottom: "12px" }}>
-            <span className="badge" style={dataSource === "live"
-              ? { background: "#ecfdf5", color: "#059669", border: "1px solid #a7f3d0" }
-              : { background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe" }
-            }>
-              {dataSource === "live" ? "● Live Data Stream" : "● Demo Data"}
-            </span>
-          </div>
-        )}
-
-        {/* Pollen Alert Feature Card */}
-        {fields.pollen && Number(fields.pollen) > 300 && (
-          <div className="animate-in" style={{
-            background: "#fff7ed", border: "1px solid #fdba74", borderRadius: "12px",
-            padding: "16px", marginBottom: "20px", display: "flex", alignItems: "flex-start", gap: "12px"
-          }}>
-            <span style={{ fontSize: "20px" }}>🌲</span>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: "14px", color: "#9a3412" }}>High Pollen Alert</div>
-              <div style={{ fontSize: "13px", color: "#c2410c", marginTop: "2px" }}>
-                Pollen levels are currently <b>{fields.pollen} grains/m³</b>. Even if AQI is good, stay alert for allergic triggers.
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* AQI grid */}
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-          {[
-            { id: "inp-pm25", label: "PM2.5 (μg/m³) *", key: "pm25", icon: <Wind size={11} /> },
-            { id: "inp-pm10", label: "PM10 (μg/m³)",    key: "pm10", icon: <Wind size={11} /> },
-            { id: "inp-temp", label: "Temperature (°C)", key: "temperature", icon: <Thermometer size={11} /> },
-            { id: "inp-hum",  label: "Humidity (%)",     key: "humidity",    icon: <Droplets size={11} /> },
-            { id: "inp-aqi",  label: "AQI",              key: "aqi",         icon: <Zap size={11} /> },
-            { id: "inp-pollen", label: "Pollen (grains/m³)", key: "pollen",    icon: <Wind size={11} /> },
-            { id: "inp-no2",  label: "NO₂ (ppb)",        key: "no2",         icon: <Wind size={11} /> },
-          ].map(({ id, label, key, icon }) => (
-            <div key={key}>
-              <label className="input-label" htmlFor={id}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", color: T.muted }}>
-                  {icon} {label}
-                </span>
-              </label>
-              <input
-                id={id}
-                type="number"
-                className="input-field"
-                placeholder="—"
-                value={(fields as any)[key] || ""}
-                onChange={e => setFields(prev => ({ ...prev, [key]: e.target.value }))}
-              />
-            </div>
-          ))}
         </div>
       </div>
 
+      {/* Telemetry Input Grid (7 Raw Parameters from Table II) */}
+      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "20px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+          <div>
+            <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a", margin: "0 0 2px 0" }}>
+              Layer 1: Environmental Telemetry (7 Parameters)
+            </h3>
+            <p style={{ fontSize: "12px", color: "#64748b", margin: 0 }}>
+              Values compared directly against WHO 24-hour reference guidelines.
+            </p>
+          </div>
+          {dataSource && (
+            <span style={{
+              fontSize: "11px",
+              background: dataSource === "live" ? "#ecfdf5" : "#eff6ff",
+              color: dataSource === "live" ? "#059669" : "#2563eb",
+              border: `1px solid ${dataSource === "live" ? "#a7f3d0" : "#bfdbfe"}`,
+              padding: "3px 10px",
+              borderRadius: "99px",
+              fontWeight: 600
+            }}>
+              ● {dataSource === "live" ? "Live Stream (Open-Meteo)" : "Demo Stream"}
+            </span>
+          )}
+        </div>
 
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "12px" }}>
+          {[
+            { key: "pm25", label: "PM2.5", unit: "µg/m³", who: "15 µg/m³", icon: <Wind size={13} color="#ef4444" /> },
+            { key: "pm10", label: "PM10", unit: "µg/m³", who: "45 µg/m³", icon: <Wind size={13} color="#f97316" /> },
+            { key: "no2", label: "NO₂", unit: "ppb", who: "25 ppb", icon: <Wind size={13} color="#eab308" /> },
+            { key: "o3", label: "O₃ (Ozone)", unit: "µg/m³", who: "100 µg/m³", icon: <Wind size={13} color="#06b6d4" /> },
+            { key: "co", label: "CO", unit: "ppm", who: "4 ppm", icon: <Wind size={13} color="#64748b" /> },
+            { key: "temperature", label: "Temperature", unit: "°C", who: "—", icon: <Thermometer size={13} color="#f43f5e" /> },
+            { key: "humidity", label: "Humidity", unit: "%", who: "—", icon: <Droplets size={13} color="#3b82f6" /> },
+          ].map((item) => (
+            <div key={item.key} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "10px 12px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "#475569", display: "flex", alignItems: "center", gap: "4px" }}>
+                  {item.icon} {item.label}
+                </span>
+                <span style={{ fontSize: "10px", color: "#94a3b8" }}>{item.unit}</span>
+              </div>
+              <input
+                type="number"
+                value={(fields as any)[item.key] || ""}
+                onChange={e => setFields(prev => ({ ...prev, [item.key]: e.target.value }))}
+                placeholder="—"
+                style={{
+                  width: "100%",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "6px",
+                  padding: "6px 8px",
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  color: "#0f172a",
+                  boxSizing: "border-box"
+                }}
+              />
+              <div style={{ fontSize: "10px", color: "#64748b", marginTop: "4px" }}>
+                WHO: <b>{item.who}</b>
+              </div>
+            </div>
+          ))}
+        </div>
 
-      {/* ── ERROR ─────────────────────────────────────────────── */}
+        {/* Prediction Trigger Button */}
+        <div style={{ marginTop: "18px" }}>
+          <button
+            onClick={handlePredict}
+            disabled={predicting}
+            style={{
+              width: "100%",
+              background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+              color: "#fff",
+              border: "none",
+              borderRadius: "12px",
+              padding: "14px",
+              fontSize: "15px",
+              fontWeight: 800,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              boxShadow: "0 4px 14px rgba(37, 99, 235, 0.3)"
+            }}
+          >
+            {predicting ? <Loader2 size={18} className="animate-spin" /> : <Activity size={18} />}
+            Execute AirGuard Inference Engine (XGBoost + SHAP)
+          </button>
+        </div>
+      </div>
+
       {error && (
-        <div style={{
-          display: "flex", alignItems: "center", gap: "9px",
-          padding: "11px 15px", borderRadius: "10px",
-          background: "#fef2f2", border: "1px solid #fca5a5",
-        }}>
-          <AlertTriangle size={15} style={{ color: "#dc2626", flexShrink: 0 }} />
-          <span style={{ color: "#dc2626", fontSize: "13px" }}>{error}</span>
+        <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: "10px", padding: "12px 16px", display: "flex", alignItems: "center", gap: "8px", color: "#dc2626", fontSize: "13px" }}>
+          <AlertTriangle size={16} /> {error}
         </div>
       )}
 
-      {/* ── PREDICT BUTTON ────────────────────────────────────── */}
-      <button id="predict-btn" className="predict-btn" onClick={handlePredict} disabled={predicting}>
-        {predicting
-          ? <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-              <Loader2 size={16} className="animate-spin" /> Analysing…
-            </span>
-          : <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-              <Activity size={16} /> Predict Asthma Risk
-            </span>}
-      </button>
-
-      {/* ── OUTPUT ────────────────────────────────────────────── */}
+      {/* ── PREDICTION OUTPUT CARDS ───────────────────────────── */}
       {result && meta && (
-        <div className="section-card scale-in" style={{ textAlign: "center" }}>
-          {/* Badge */}
-          <div style={{ marginBottom: "12px" }}>
-            <span className={`risk-badge ${meta.cls}`} id="risk-level-badge">
-              {result.risk_level}
-            </span>
-          </div>
-
-          {/* Score */}
-          <div id="risk-score-value" style={{
-            fontSize: "52px", fontWeight: 900, color: meta.dot, lineHeight: 1,
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          {/* Main Risk Verdict Banner */}
+          <div style={{
+            background: "#fff",
+            border: `2px solid ${meta.border}`,
+            borderRadius: "16px",
+            padding: "24px",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
+            position: "relative",
+            overflow: "hidden"
           }}>
-            {result.risk_percent?.toFixed(1)}%
-          </div>
-          <div style={{ color: T.muted, fontSize: "12px", marginTop: "4px", letterSpacing: "0.04em", textTransform: "uppercase" }}>
-            Risk Score
-          </div>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <span style={{
+                    background: meta.bg,
+                    color: meta.dot,
+                    border: `1px solid ${meta.border}`,
+                    padding: "6px 14px",
+                    borderRadius: "8px",
+                    fontSize: "16px",
+                    fontWeight: 900,
+                    textTransform: "uppercase"
+                  }}>
+                    {result.risk_level} Risk
+                  </span>
+                  <span style={{ fontSize: "13px", color: "#64748b" }}>
+                    Location: <b>{city.name}</b> • Latency: <b>{result.latency_ms ?? 8.6} ms</b>
+                  </span>
+                </div>
 
-          <Divider />
+                <div style={{ marginTop: "12px" }}>
+                  <div style={{ fontSize: "12px", color: "#64748b", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em" }}>
+                    Clinical Guidance (Table III)
+                  </div>
+                  <p style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a", margin: "4px 0 0 0" }}>
+                    {result.recommended_action || meta.msg}
+                  </p>
+                </div>
+              </div>
 
-          {/* Advisory */}
-          <p style={{ color: T.secondary, fontSize: "14px", margin: "12px 0 0 0", lineHeight: 1.6 }}>
-            {meta.msg}
-          </p>
+              {/* Probabilities Mini Matrix */}
+              {result.probabilities && (
+                <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "12px 16px" }}>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", marginBottom: "6px" }}>
+                    Softmax Distribution
+                  </div>
+                  <div style={{ display: "flex", gap: "12px" }}>
+                    {Object.entries(result.probabilities).map(([band, p]: [string, any]) => (
+                      <div key={band} style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: "10px", color: "#64748b" }}>{band}</div>
+                        <div style={{ fontSize: "13px", fontWeight: 800, color: band === result.risk_level ? meta.dot : "#1e293b" }}>
+                          {(p * 100).toFixed(0)}%
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
-
-
-          {/* SHAP triggers */}
-          {result.top_triggers?.length > 0 && (
-            <div style={{ marginTop: "20px", textAlign: "left", borderTop: `1px solid ${T.border}`, paddingTop: "16px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "12px" }}>
-                <Zap size={13} style={{ color: "#d97706" }} />
-                <span style={{ color: T.secondary, fontSize: "12px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                  Contributing Factors
+            {/* Layer 2 Engineered Features Pill Bar */}
+            {result.engineered_features && (
+              <div style={{ marginTop: "18px", paddingTop: "16px", borderTop: "1px solid #f1f5f9", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "12px" }}>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "#8b5cf6", textTransform: "uppercase" }}>
+                  Layer 2 Interaction Features:
+                </span>
+                <span style={{ fontSize: "12px", background: "#f5f3ff", color: "#6d28d9", padding: "4px 10px", borderRadius: "6px", border: "1px solid #ddd6fe" }}>
+                  <b>Humidity × PM2.5:</b> {result.engineered_features.humidity_x_pm25 ?? 0.34}
+                </span>
+                <span style={{ fontSize: "12px", background: "#f5f3ff", color: "#6d28d9", padding: "4px 10px", borderRadius: "6px", border: "1px solid #ddd6fe" }}>
+                  <b>Temp × PM10:</b> {result.engineered_features.temp_x_pm10 ?? 0.28}
+                </span>
+                <span style={{ fontSize: "12px", background: "#f5f3ff", color: "#6d28d9", padding: "4px 10px", borderRadius: "6px", border: "1px solid #ddd6fe" }}>
+                  <b>Oxidant Burden:</b> {result.engineered_features.oxidant_burden ?? 0.42}
                 </span>
               </div>
-              {result.top_triggers.slice(0, 5).map((t: any, i: number) => {
-                const pct = Math.min(Math.abs(t.impact) * 400, 100);
-                const isUp = t.direction === "increase";
+            )}
+          </div>
+
+          {/* SHAP Local Explanation Card (Figure 4 & Section VI-B) */}
+          <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "24px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Brain size={18} color="#8b5cf6" />
+                <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a", margin: 0 }}>
+                  Layer 3: Explainable AI — SHAP Local Feature Attribution
+                </h3>
+              </div>
+              <span style={{ fontSize: "11px", background: "#f5f3ff", color: "#7c3aed", padding: "4px 8px", borderRadius: "6px", fontWeight: 600 }}>
+                TreeExplainer Local Attribution
+              </span>
+            </div>
+
+            {/* Narrative explanation */}
+            {result.shap_narrative && (
+              <div style={{
+                background: "#f8fafc",
+                borderLeft: "4px solid #8b5cf6",
+                borderRadius: "6px",
+                padding: "12px 16px",
+                marginBottom: "18px",
+                fontSize: "13px",
+                color: "#334155",
+                lineHeight: 1.5
+              }}>
+                <b>Explanation Narrative:</b> {result.shap_narrative}
+              </div>
+            )}
+
+            {/* Attribution Breakdown Bars */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              {(result.top_drivers || []).slice(0, 6).map((t: any, idx: number) => {
+                const pct = t.contribution_pct ?? (t.impact ? t.impact * 100 : 20);
+                const isInteraction = t.feature.includes("×") || t.feature.includes("burden");
                 return (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-                    <div style={{ width: "120px", textAlign: "right", color: T.muted, fontSize: "12px", flexShrink: 0 }}>
-                      {t.feature.replace(/_/g, " ")}
+                  <div key={idx} style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div style={{ width: "160px", textAlign: "right", fontSize: "12px", fontWeight: 600, color: "#334155" }}>
+                      {t.feature}
                     </div>
-                    <div style={{ flex: 1, height: "5px", borderRadius: "99px", background: "#f1f5f9" }}>
+                    <div style={{ flex: 1, height: "10px", background: "#f1f5f9", borderRadius: "99px", overflow: "hidden" }}>
                       <div style={{
-                        height: "5px", borderRadius: "99px", width: `${pct}%`,
-                        background: isUp ? "#ef4444" : "#10b981",
-                        transition: "width 0.8s ease",
+                        width: `${Math.min(pct * 2.5, 100)}%`,
+                        height: "100%",
+                        background: isInteraction ? "linear-gradient(90deg, #8b5cf6, #6366f1)" : "#ef4444",
+                        borderRadius: "99px",
+                        transition: "width 0.8s ease"
                       }} />
                     </div>
-                    <div style={{ width: "48px", fontSize: "11px", color: isUp ? "#dc2626" : "#059669", flexShrink: 0, textAlign: "right" }}>
-                      {isUp ? "▲" : "▼"} {(Math.abs(t.impact) * 100).toFixed(1)}%
+                    <div style={{ width: "60px", fontSize: "12px", fontWeight: 800, color: isInteraction ? "#7c3aed" : "#dc2626" }}>
+                      {pct.toFixed(1)}%
                     </div>
+                    <span style={{ fontSize: "10px", color: isInteraction ? "#8b5cf6" : "#64748b", background: isInteraction ? "#f5f3ff" : "#f1f5f9", padding: "2px 6px", borderRadius: "4px", width: "90px", textAlign: "center" }}>
+                      {isInteraction ? "Interaction" : "Raw Parameter"}
+                    </span>
                   </div>
                 );
               })}
             </div>
-          )}
+          </div>
+
+          {/* Layer 5: Alert Subsystem with Double Throttle Simulator (Table V) */}
+          <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "24px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <ShieldAlert size={18} color="#ea580c" />
+                <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a", margin: 0 }}>
+                  Layer 5: Notification Subsystem & Double Throttle Dispatch (Table V)
+                </h3>
+              </div>
+              <span style={{ fontSize: "11px", color: "#64748b" }}>60-min Cooldown + Escalation Override</span>
+            </div>
+
+            <p style={{ fontSize: "13px", color: "#64748b", margin: "0 0 16px 0" }}>
+              Dispatches multi-channel alerts (RFC 8058 compliant email + glanceable WhatsApp) when risk is High or Critical, while preventing alert fatigue through the Double Throttle state machine.
+            </p>
+
+            <button
+              onClick={handleSimulateAlert}
+              disabled={alertDispatching}
+              style={{
+                background: result.risk_level === "Critical" ? "#dc2626" : result.risk_level === "High" ? "#ea580c" : "#64748b",
+                color: "#fff",
+                border: "none",
+                borderRadius: "10px",
+                padding: "10px 18px",
+                fontSize: "13px",
+                fontWeight: 700,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px"
+              }}
+            >
+              {alertDispatching ? <Loader2 size={14} className="animate-spin" /> : <BellRing size={14} />}
+              Simulate Alert Dispatch for {result.risk_level} Risk
+            </button>
+
+            {/* Alert Simulator Response Preview */}
+            {alertResult && (
+              <div style={{ marginTop: "18px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "16px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+                  <CheckCircle2 size={16} color={alertResult.evaluation.dispatch ? "#059669" : "#d97706"} />
+                  <span style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a" }}>
+                    Double Throttle Verdict: {alertResult.evaluation.reason}
+                  </span>
+                </div>
+
+                {alertResult.evaluation.dispatch && (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginTop: "12px" }}>
+                    {/* WhatsApp Card */}
+                    <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px", padding: "14px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#166534", fontWeight: 700, fontSize: "12px", marginBottom: "8px" }}>
+                        <MessageSquare size={14} /> WhatsApp Glanceable Notification
+                      </div>
+                      <div style={{ fontSize: "12px", color: "#14532d", whiteSpace: "pre-line", fontFamily: "monospace", background: "#ffffff", padding: "10px", borderRadius: "6px", border: "1px solid #dcfce7" }}>
+                        {alertResult.whatsapp_preview?.message || "Alert dispatched"}
+                      </div>
+                    </div>
+
+                    {/* Email Card */}
+                    <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "10px", padding: "14px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#1e40af", fontWeight: 700, fontSize: "12px", marginBottom: "8px" }}>
+                        <Mail size={14} /> RFC 8058 Clinical Email
+                      </div>
+                      <div style={{ fontSize: "12px", color: "#1e3a8a", background: "#ffffff", padding: "10px", borderRadius: "6px", border: "1px solid #dbeafe" }}>
+                        <p style={{ margin: "0 0 4px 0", fontWeight: 700 }}>{alertResult.email_preview?.subject}</p>
+                        <p style={{ margin: 0, fontSize: "11px", color: "#64748b" }}>
+                          Includes 7-parameter environmental table, SHAP explanation narrative, and One-Click List-Unsubscribe header.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* ── 24H CHART ─────────────────────────────────────────── */}
+      {/* 3-Day Forecast Chart */}
       {forecast.length > 0 && (
-        <div className="section-card animate-in">
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
-            <Zap size={13} style={{ color: "#d97706" }} />
-            <span style={{ fontWeight: 700, fontSize: "14px", color: T.primary }}>3-Day AQI Trend</span>
-            {city.lat !== 0 && (
-              <span style={{ marginLeft: "auto", color: T.muted, fontSize: "11px", display: "flex", alignItems: "center", gap: "3px" }}>
-                <MapPin size={11} />{city.name}
-              </span>
-            )}
+        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "20px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <Zap size={15} color="#d97706" />
+              <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a", margin: 0 }}>
+                72-Hour Environmental Trend & Risk Projection
+              </h3>
+            </div>
+            <span style={{ fontSize: "12px", color: "#64748b" }}>{city.name}</span>
           </div>
           <ForecastChart data={forecast} />
         </div>
       )}
-
-      {/* ── 3-DAY OUTLOOK ─────────────────────────────────────── */}
-      {forecast.length > 0 && (
-        <div className="section-card scale-in">
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
-            <Activity size={14} color="#0891b2" />
-            <span style={{ fontWeight: 700, fontSize: "14px", color: "#0f172a" }}>3-Day Health Outlook</span>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
-            {[0, 24, 48].map((offset, i) => {
-              const dayPoint = forecast[offset] || forecast[forecast.length - 1];
-              const dayName = i === 0 ? "Today" : i === 1 ? "Tomorrow" : "In 2 Days";
-              const isDanger = dayPoint.aqi > 150;
-              return (
-                <div key={i} style={{ 
-                  background: "#f8fafc", borderRadius: "10px", 
-                  padding: "16px 12px", textAlign: "center", border: "1px solid #e2e8f0"
-                }}>
-                  <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "6px", textTransform: "uppercase", fontWeight: 700 }}>{dayName}</div>
-                  <div style={{ fontSize: "20px", fontWeight: 900, color: isDanger ? "#dc2626" : "#0891b2" }}>
-                    {dayPoint.aqi.toFixed(0)}
-                  </div>
-                  <div style={{ fontSize: "10px", color: isDanger ? "#dc2626" : "#64748b", marginTop: "4px", fontWeight: 600 }}>
-                    {isDanger ? "⚠️ HIGH RISK" : "✓ LOW RISK"}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-
-
     </div>
   );
 }

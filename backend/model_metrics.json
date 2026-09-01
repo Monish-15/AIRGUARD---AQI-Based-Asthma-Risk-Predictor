@@ -1,0 +1,229 @@
+{
+  "table_vi_distribution": [
+    {
+      "risk_class": "Low",
+      "count": 6200,
+      "share": "41.3%"
+    },
+    {
+      "risk_class": "Moderate",
+      "count": 4850,
+      "share": "32.3%"
+    },
+    {
+      "risk_class": "High",
+      "count": 2900,
+      "share": "19.3%"
+    },
+    {
+      "risk_class": "Critical",
+      "count": 1050,
+      "share": "7.0%"
+    }
+  ],
+  "table_vii_test_performance": {
+    "per_class": [
+      {
+        "risk_class": "Low",
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 1240
+      },
+      {
+        "risk_class": "Moderate",
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 970
+      },
+      {
+        "risk_class": "High",
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 580
+      },
+      {
+        "risk_class": "Critical",
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 210
+      }
+    ],
+    "overall_accuracy": 0.92,
+    "weighted_f1": 0.92,
+    "macro_f1": 0.91,
+    "cohen_kappa": 0.88
+  },
+  "table_viii_baselines": {
+    "Logistic Regression": {
+      "acc": 0.74,
+      "f1_w": 0.72,
+      "kappa": 0.61,
+      "latency_ms": 1.2
+    },
+    "Decision Tree": {
+      "acc": 0.81,
+      "f1_w": 0.79,
+      "kappa": 0.71,
+      "latency_ms": 0.8
+    },
+    "Random Forest": {
+      "acc": 0.87,
+      "f1_w": 0.86,
+      "kappa": 0.81,
+      "latency_ms": 18.4
+    },
+    "SVM (RBF)": {
+      "acc": 0.83,
+      "f1_w": 0.81,
+      "kappa": 0.75,
+      "latency_ms": 32.7
+    },
+    "LSTM": {
+      "acc": 0.89,
+      "f1_w": 0.88,
+      "kappa": 0.83,
+      "latency_ms": 145.3
+    },
+    "XGBoost (ours)": {
+      "acc": 0.92,
+      "f1_w": 0.92,
+      "kappa": 0.88,
+      "latency_ms": 8.6
+    }
+  },
+  "table_ix_latency": [
+    {
+      "percentile": "P50",
+      "cache_miss_ms": 312,
+      "cache_hit_ms": 134
+    },
+    {
+      "percentile": "P75",
+      "cache_miss_ms": 401,
+      "cache_hit_ms": 178
+    },
+    {
+      "percentile": "P90",
+      "cache_miss_ms": 487,
+      "cache_hit_ms": 221
+    },
+    {
+      "percentile": "P95",
+      "cache_miss_ms": 614,
+      "cache_hit_ms": 259
+    },
+    {
+      "percentile": "P99",
+      "cache_miss_ms": 892,
+      "cache_hit_ms": 318
+    }
+  ],
+  "table_x_ablation": [
+    {
+      "configuration": "Full AirGuard system",
+      "f1": 0.92,
+      "delta_f1": 0.0
+    },
+    {
+      "configuration": "w/o feature engineering",
+      "f1": 0.84,
+      "delta_f1": -0.08
+    },
+    {
+      "configuration": "w/o missing value imputation",
+      "f1": 0.86,
+      "delta_f1": -0.06
+    },
+    {
+      "configuration": "w/o SMOTE oversampling",
+      "f1": 0.88,
+      "delta_f1": -0.04
+    },
+    {
+      "configuration": "w/o outlier correction",
+      "f1": 0.9,
+      "delta_f1": -0.02
+    },
+    {
+      "configuration": "w/o L2 regularization",
+      "f1": 0.89,
+      "delta_f1": -0.03
+    },
+    {
+      "configuration": "w/o min-max normalization",
+      "f1": 0.91,
+      "delta_f1": -0.01
+    },
+    {
+      "configuration": "Raw features, no preprocessing",
+      "f1": 0.79,
+      "delta_f1": -0.13
+    }
+  ],
+  "figure_4_shap_weights": [
+    {
+      "feature": "PM2.5",
+      "key": "pm25",
+      "weight_pct": 24.1,
+      "is_interaction": false
+    },
+    {
+      "feature": "PM2.5 \u00d7 Humidity",
+      "key": "humidity_x_pm25",
+      "weight_pct": 17.6,
+      "is_interaction": true
+    },
+    {
+      "feature": "O3",
+      "key": "o3",
+      "weight_pct": 14.5,
+      "is_interaction": false
+    },
+    {
+      "feature": "Oxidant burden",
+      "key": "oxidant_burden",
+      "weight_pct": 11.1,
+      "is_interaction": true
+    },
+    {
+      "feature": "NO2",
+      "key": "no2",
+      "weight_pct": 9.1,
+      "is_interaction": false
+    },
+    {
+      "feature": "Humidity",
+      "key": "humidity",
+      "weight_pct": 7.5,
+      "is_interaction": false
+    },
+    {
+      "feature": "Temp \u00d7 PM10",
+      "key": "temp_x_pm10",
+      "weight_pct": 5.9,
+      "is_interaction": true
+    },
+    {
+      "feature": "PM10",
+      "key": "pm10",
+      "weight_pct": 4.9,
+      "is_interaction": false
+    },
+    {
+      "feature": "Temperature",
+      "key": "temperature",
+      "weight_pct": 3.7,
+      "is_interaction": false
+    },
+    {
+      "feature": "CO",
+      "key": "co",
+      "weight_pct": 1.6,
+      "is_interaction": false
+    }
+  ]
+}

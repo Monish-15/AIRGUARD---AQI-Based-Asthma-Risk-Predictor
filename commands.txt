@@ -1,7 +1,16 @@
+# -------------------------------------------------------------
+# AirGuard: How to Run Backend & Frontend
+# -------------------------------------------------------------
+
+# 1. Start Python FastAPI Backend (Layer 1 - 5 Engine)
+# From workspace root:
+python -m uvicorn backend.main:app --reload --port 8000
+# Or:
 cd backend
-.\venv\Scripts\Activate.ps1
-uvicorn main:app --reload --port 8000
+python -m uvicorn main:app --reload --port 8000
 
+# 2. Retrain Model & Generate Evaluation Metrics (Optional):
+python backend/train.py
 
-cd frontend
+# 3. Start Next.js Frontend UI:
 npm run dev

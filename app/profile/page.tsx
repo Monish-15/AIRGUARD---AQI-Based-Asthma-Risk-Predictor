@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { createUser } from "@/lib/api";
-import { Save, User, Heart, Pill, MapPin, CheckCircle2, FileText, Bell, Mail, Smartphone } from "lucide-react";
+import { Save, User, Heart, Pill, MapPin, CheckCircle2, FileText, Bell, Mail, Smartphone, Settings, Key, ExternalLink, ShieldCheck, AlertCircle, Loader2 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -60,6 +60,8 @@ export default function ProfilePage() {
   const [waTestSent, setWaTestSent] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
   const [sendingWaTest, setSendingWaTest] = useState(false);
+
+  const [emailFeedback, setEmailFeedback] = useState<{ success: boolean; message: string } | null>(null);
 
   useEffect(() => {
     const id = typeof window !== "undefined" ? localStorage.getItem("userId") : null;
@@ -309,13 +311,22 @@ export default function ProfilePage() {
         <Card>
           <CardHeader icon={<Bell size={15} color="#2563eb" />} title="Proactive Health Alerts" />
           <p style={{ fontSize: "12px", color: "#64748b", marginTop: "-12px", marginBottom: "18px" }}>
-            Receive a warning every morning at 7:00 AM if your local air quality or pollen levels pose a high risk.
+            AirGuard monitors live environmental telemetry 24/7. When risk reaches High or Critical levels, alerts are automatically dispatched to your contact channels (governed by the paper's Double Throttle cooldown policy).
           </p>
+
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px", background: "#f8fafc", borderRadius: "10px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <Mail size={16} color="#64748b" />
-                <span style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>Email Notifications</span>
+            {/* Email Notifications Toggle */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px", background: "#f8fafc", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div style={{ width: "36px", height: "36px", borderRadius: "8px", background: "#eff6ff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Mail size={18} color="#2563eb" />
+                </div>
+                <div>
+                  <div style={{ fontSize: "14px", fontWeight: 700, color: "#0f172a" }}>Email Notifications (RFC 8058)</div>
+                  <div style={{ fontSize: "12px", color: "#64748b" }}>
+                    Delivers 7-parameter environmental table, WHO limits, and AI trigger explanations to <b>{form.email || "your registered email"}</b>
+                  </div>
+                </div>
               </div>
               <button 
                 onClick={() => setForm(f => ({ ...f, alerts_email: !f.alerts_email }))}
@@ -331,37 +342,80 @@ export default function ProfilePage() {
                 }} />
               </button>
             </div>
+
+            {/* Email Test Button & Feedback */}
             {form.alerts_email && (
-              <div style={{ marginTop: "4px" }}>
-                <button
-                  onClick={async () => {
-                    if (!form.email) return;
-                    setSendingTest(true);
-                    try {
-                      const { sendTestEmail } = await import("@/lib/api");
-                      await sendTestEmail(form.email, form.name || "User");
-                      setTestSent(true);
-                      setTimeout(() => setTestSent(false), 5000);
-                    } catch (e) {
-                      console.error(e);
-                      alert("Test search failed. Check if SMTP is configured in backend/.env");
-                    } finally { setSendingTest(false); }
-                  }}
-                  disabled={sendingTest || !form.email}
-                  style={{
-                    fontSize: "12px", color: testSent ? "#059669" : "#2563eb",
-                    background: "none", border: "none", padding: "0 12px",
-                    textDecoration: "underline", cursor: "pointer", fontWeight: 600,
-                  }}
-                >
-                  {sendingTest ? "Sending..." : testSent ? "✅ Test Dispatch Successful (Check Console/Email)" : "Send Test Notification →"}
-                </button>
+              <div style={{ padding: "0 4px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <button
+                    onClick={async () => {
+                      if (!form.email) {
+                        alert("Please enter your email address in Basic Information above!");
+                        return;
+                      }
+                      setSendingTest(true);
+                      setEmailFeedback(null);
+                      try {
+                        const { sendTestEmail } = await import("@/lib/api");
+                        const resp = await sendTestEmail(form.email, form.name || "User");
+                        setEmailFeedback({
+                          success: true,
+                          message: resp.message || `Test alert email successfully dispatched to ${form.email}!`
+                        });
+                      } catch (e: any) {
+                        setEmailFeedback({
+                          success: false,
+                          message: e.message || "Failed to dispatch test alert email."
+                        });
+                      } finally { setSendingTest(false); }
+                    }}
+                    disabled={sendingTest || !form.email}
+                    style={{
+                      fontSize: "12px",
+                      color: "#fff",
+                      background: "#2563eb",
+                      border: "none",
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      fontWeight: 600,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px"
+                    }}
+                  >
+                    {sendingTest ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />}
+                    {sendingTest ? "Dispatching Alert..." : `Send Test Alert to ${form.email || "Your Email"} →`}
+                  </button>
+                </div>
+
+                {emailFeedback && (
+                  <div style={{
+                    padding: "10px 14px",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    background: emailFeedback.success ? "#ecfdf5" : "#fef2f2",
+                    border: `1px solid ${emailFeedback.success ? "#a7f3d0" : "#fca5a5"}`,
+                    color: emailFeedback.success ? "#065f46" : "#991b1b"
+                  }}>
+                    {emailFeedback.success ? <CheckCircle2 size={14} color="#059669" /> : <AlertCircle size={14} color="#dc2626" />}
+                    <span>{emailFeedback.message}</span>
+                  </div>
+                )}
               </div>
             )}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px", background: "#f8fafc", borderRadius: "10px" }}>
+
+            {/* WhatsApp Toggle */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px", background: "#f8fafc", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <span style={{ fontSize: "16px" }}>💬</span>
-                <span style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>WhatsApp Notifications</span>
+                <div>
+                  <div style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>WhatsApp Notifications</div>
+                  <div style={{ fontSize: "11px", color: "#64748b" }}>Glanceable instant message with single primary trigger</div>
+                </div>
               </div>
               <button 
                 onClick={() => setForm(f => ({ ...f, alerts_whatsapp: !f.alerts_whatsapp }))}

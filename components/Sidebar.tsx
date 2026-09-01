@@ -8,13 +8,14 @@ import {
 } from "lucide-react";
 
 const NAV = [
-  { href: "/",         label: "Predictor",   icon: LayoutDashboard, desc: "Risk assessment" },
-  { href: "/compare",  label: "Compare",     icon: Scale,           desc: "City comparison" },
-  { href: "/timeline", label: "Timeline",    icon: Activity,        desc: "30-day history" },
-  { href: "/insights", label: "AI Insights", icon: Brain,           desc: "Attack patterns" },
-  { href: "/map",      label: "Safe Zones",  icon: Map,             desc: "Dynamic API map" },
-  { href: "/profile",  label: "My Profile",  icon: User,            desc: "Health settings" },
-  { href: "/login",    label: "Account",     icon: LogIn,           desc: "Sign in / out" },
+  { href: "/",         label: "Predictor",    icon: LayoutDashboard, desc: "Risk assessment" },
+  { href: "/research", label: "Research Hub", icon: Brain,           desc: "Paper benchmarks" },
+  { href: "/compare",  label: "Compare",      icon: Scale,           desc: "City comparison" },
+  { href: "/timeline", label: "Timeline",     icon: Activity,        desc: "30-day history" },
+  { href: "/insights", label: "AI Insights",  icon: Wind,            desc: "Attack patterns" },
+  { href: "/map",      label: "Safe Zones",   icon: Map,             desc: "Dynamic API map" },
+  { href: "/profile",  label: "My Profile",   icon: User,            desc: "Health settings" },
+  { href: "/login",    label: "Account",      icon: LogIn,           desc: "Sign in / out" },
 ];
 
 export default function Sidebar() {

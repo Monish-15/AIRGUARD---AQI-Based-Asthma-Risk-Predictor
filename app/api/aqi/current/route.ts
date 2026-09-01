@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { validateCoordinates } from "@/lib/sanitize";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const lat = parseFloat(searchParams.get("lat") || "12.9716");
-  const lon = parseFloat(searchParams.get("lon") || "77.5946");
+  const coordCheck = validateCoordinates(
+    searchParams.get("lat"),
+    searchParams.get("lon")
+  );
+  const lat = coordCheck.lat;
+  const lon = coordCheck.lon;
+
 
   try {
     // Open-Meteo Air Quality API (free, no API key)

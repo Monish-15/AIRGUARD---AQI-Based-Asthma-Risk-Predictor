@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { validateCoordinates, sanitizeNumber } from "@/lib/sanitize";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const lat = parseFloat(searchParams.get("lat") || "12.9716");
-  const lon = parseFloat(searchParams.get("lon") || "77.5946");
-  const hours = Math.min(parseInt(searchParams.get("hours") || "72"), 168);
+  const coordCheck = validateCoordinates(
+    searchParams.get("lat"),
+    searchParams.get("lon")
+  );
+  const lat = coordCheck.lat;
+  const lon = coordCheck.lon;
+  const hours = sanitizeNumber(searchParams.get("hours"), 1, 168, 72);
+
 
   try {
     // Open-Meteo Air Quality hourly forecast
