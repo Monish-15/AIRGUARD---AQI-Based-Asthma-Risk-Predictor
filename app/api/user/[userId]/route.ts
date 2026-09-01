@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sanitizeString, sanitizeNumber, validateEmail, sanitizeObject } from "@/lib/sanitize";
 
-export const runtime = "edge";
 
 interface UserProfile {
   id: number;

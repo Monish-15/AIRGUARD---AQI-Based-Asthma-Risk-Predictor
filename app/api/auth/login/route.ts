@@ -21,31 +21,8 @@ const DEMO_USER = {
 };
 
 export async function POST(req: NextRequest) {
-  // Defense-in-depth: If proxy was bypassed, apply rate limiter
-  if (!req.headers.get("x-ratelimit-applied")) {
-    const clientIp = getClientIp(req);
-    const key = `login:${clientIp}`;
-    const result = checkRateLimit(
-      key,
-      RATE_LIMIT_CONFIG.LOGIN.limit,
-      RATE_LIMIT_CONFIG.LOGIN.windowMs
-    );
-    if (!result.success) {
-      return NextResponse.json(
-        {
-          error: "Too Many Requests",
-          detail: `Too many login attempts. Maximum 5 attempts allowed per 15 minutes. Please try again in ${result.retryAfter} seconds.`,
-          retryAfter: result.retryAfter,
-        },
-        {
-          status: 429,
-          headers: getRateLimitHeaders(result),
-        }
-      );
-    }
-  }
-
   try {
+
     let body: any;
     try {
       body = await req.json();

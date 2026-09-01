@@ -315,8 +315,9 @@ def format_email_alert(
           </table>
 
           <div style="border-top: 1px solid #e2e8f0; padding-top: 16px; font-size: 11px; color: #94a3b8; text-align: center;">
-            <p>AirGuard Proactive Respiratory System • Karunya Institute of Technology and Sciences</p>
+            <p>AirGuard Proactive Respiratory Health System</p>
             <p>You received this alert because you subscribed to proactive notifications for {safe_location}.</p>
+
             <p><a href="https://airguard.health/unsubscribe?token={safe_token}" style="color: #64748b;">One-Click Unsubscribe (RFC 8058 compliant)</a></p>
           </div>
         </div>

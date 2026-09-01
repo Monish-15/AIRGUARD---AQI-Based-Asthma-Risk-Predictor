@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "edge";
 
 // Demo insights per user (no database on Vercel free tier)
 function buildInsights(userId: number) {

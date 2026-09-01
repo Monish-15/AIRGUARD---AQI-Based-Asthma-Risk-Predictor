@@ -14,14 +14,15 @@ import {
   Info, ArrowRight, BellRing
 } from "lucide-react";
 
-/* ─── 5 Paper Cities (Table VI) ──────────────────────────────── */
-const PAPER_CITIES = [
-  { name: "Bengaluru", lat: 12.9716, lon: 77.5946, tag: "Tech Hub / Baseline" },
-  { name: "Delhi", lat: 28.6139, lon: 77.2090, tag: "High Winter PM2.5" },
-  { name: "Mumbai", lat: 19.0760, lon: 72.8777, tag: "High Humidity Coastal" },
-  { name: "Chennai", lat: 13.0827, lon: 80.2707, tag: "Tropical Maritime" },
-  { name: "Hyderabad", lat: 17.3850, lon: 78.4867, tag: "Semi-Arid Plateau" },
+/* ─── Regional Benchmark Cities ──────────────────────────────── */
+const SUPPORTED_CITIES = [
+  { name: "Bengaluru", lat: 12.9716, lon: 77.5946, tag: "Tech Corridor / Plateau" },
+  { name: "Delhi", lat: 28.6139, lon: 77.2090, tag: "Northern Plains" },
+  { name: "Mumbai", lat: 19.0760, lon: 72.8777, tag: "Western Coastal" },
+  { name: "Chennai", lat: 13.0827, lon: 80.2707, tag: "Eastern Maritime" },
+  { name: "Hyderabad", lat: 17.3850, lon: 78.4867, tag: "Deccan Plateau" },
 ];
+
 
 /* ─── WHO 24h reference guidelines (Table II) ─────────────────── */
 const WHO_GUIDELINES: Record<string, string> = {
@@ -53,7 +54,7 @@ function riskMeta(level: string) {
 const DEF = { pm25: "", pm10: "", no2: "", o3: "", co: "", humidity: "", temperature: "", aqi: "", pollen: "" };
 
 export default function PredictorPage() {
-  const [city, setCity] = useState(PAPER_CITIES[0]);
+  const [city, setCity] = useState(SUPPORTED_CITIES[0]);
   const [fields, setFields] = useState({ ...DEF });
   const [autoFilling, setAutoFilling] = useState(false);
   const [dataSource, setDataSource] = useState<string | null>(null);
@@ -201,15 +202,15 @@ export default function PredictorPage() {
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
             <span style={{ background: "#2563eb", color: "#fff", fontSize: "11px", fontWeight: 700, padding: "2px 8px", borderRadius: "4px", textTransform: "uppercase" }}>
-              Research Pipeline
+              Active Intelligence
             </span>
-            <span style={{ fontSize: "12px", color: "#94a3b8" }}>10D Feature XGBoost + SHAP Attributions</span>
+            <span style={{ fontSize: "12px", color: "#94a3b8" }}>Real-time Air Quality & Clinical Risk Assessment</span>
           </div>
           <h1 style={{ fontSize: "22px", fontWeight: 800, margin: 0, letterSpacing: "-0.01em" }}>
             AirGuard Risk Intelligence Predictor
           </h1>
           <p style={{ color: "#94a3b8", fontSize: "13px", margin: "4px 0 0 0" }}>
-            Real-time environmental telemetry mapped to 4 clinical risk bands with SHAP local explainability.
+            Live environmental telemetry mapped to clinical risk bands with explainable risk attributions.
           </p>
         </div>
 
@@ -236,17 +237,18 @@ export default function PredictorPage() {
         </button>
       </div>
 
-      {/* City Selector Pills (Table VI Cities) */}
+      {/* City Selector Pills */}
       <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "18px 20px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
           <span style={{ fontSize: "12px", fontWeight: 700, textTransform: "uppercase", color: "#64748b", letterSpacing: "0.05em" }}>
-            Evaluation Cities (15,000 Dataset Study)
+            Regional Climates & Monitoring Stations
           </span>
           <span style={{ fontSize: "12px", color: "#94a3b8" }}>Selected: <b>{city.name}</b></span>
         </div>
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
-          {PAPER_CITIES.map((c) => {
+          {SUPPORTED_CITIES.map((c) => {
+
             const isSel = city.name === c.name;
             return (
               <button
@@ -338,17 +340,18 @@ export default function PredictorPage() {
         </div>
       </div>
 
-      {/* Telemetry Input Grid (7 Raw Parameters from Table II) */}
+      {/* Telemetry Input Grid */}
       <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "20px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
           <div>
             <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a", margin: "0 0 2px 0" }}>
-              Layer 1: Environmental Telemetry (7 Parameters)
+              Live Environmental Telemetry (7 Key Air Pollutants)
             </h3>
             <p style={{ fontSize: "12px", color: "#64748b", margin: 0 }}>
-              Values compared directly against WHO 24-hour reference guidelines.
+              Readings compared directly against WHO 24-hour health guidelines.
             </p>
           </div>
+
           {dataSource && (
             <span style={{
               fontSize: "11px",
@@ -427,8 +430,9 @@ export default function PredictorPage() {
             }}
           >
             {predicting ? <Loader2 size={18} className="animate-spin" /> : <Activity size={18} />}
-            Execute AirGuard Inference Engine (XGBoost + SHAP)
+            Run Risk Assessment Engine
           </button>
+
         </div>
       </div>
 
@@ -473,11 +477,12 @@ export default function PredictorPage() {
 
                 <div style={{ marginTop: "12px" }}>
                   <div style={{ fontSize: "12px", color: "#64748b", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em" }}>
-                    Clinical Guidance (Table III)
+                    Clinical Guidance & Recommendations
                   </div>
                   <p style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a", margin: "4px 0 0 0" }}>
                     {result.recommended_action || meta.msg}
                   </p>
+
                 </div>
               </div>
 
@@ -501,11 +506,11 @@ export default function PredictorPage() {
               )}
             </div>
 
-            {/* Layer 2 Engineered Features Pill Bar */}
+            {/* Engineered Synergy Features */}
             {result.engineered_features && (
               <div style={{ marginTop: "18px", paddingTop: "16px", borderTop: "1px solid #f1f5f9", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "12px" }}>
                 <span style={{ fontSize: "11px", fontWeight: 700, color: "#8b5cf6", textTransform: "uppercase" }}>
-                  Layer 2 Interaction Features:
+                  Environmental Synergies:
                 </span>
                 <span style={{ fontSize: "12px", background: "#f5f3ff", color: "#6d28d9", padding: "4px 10px", borderRadius: "6px", border: "1px solid #ddd6fe" }}>
                   <b>Humidity × PM2.5:</b> {result.engineered_features.humidity_x_pm25 ?? 0.34}
@@ -520,19 +525,20 @@ export default function PredictorPage() {
             )}
           </div>
 
-          {/* SHAP Local Explanation Card (Figure 4 & Section VI-B) */}
+          {/* AI Explanation Card */}
           <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "24px" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <Brain size={18} color="#8b5cf6" />
                 <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a", margin: 0 }}>
-                  Layer 3: Explainable AI — SHAP Local Feature Attribution
+                  Explainable AI — Key Risk Drivers
                 </h3>
               </div>
               <span style={{ fontSize: "11px", background: "#f5f3ff", color: "#7c3aed", padding: "4px 8px", borderRadius: "6px", fontWeight: 600 }}>
-                TreeExplainer Local Attribution
+                Feature Contribution Analysis
               </span>
             </div>
+
 
             {/* Narrative explanation */}
             {result.shap_narrative && (
@@ -581,17 +587,18 @@ export default function PredictorPage() {
             </div>
           </div>
 
-          {/* Layer 5: Alert Subsystem with Double Throttle Simulator (Table V) */}
+          {/* Alert Subsystem */}
           <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "24px" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <ShieldAlert size={18} color="#ea580c" />
                 <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a", margin: 0 }}>
-                  Layer 5: Notification Subsystem & Double Throttle Dispatch (Table V)
+                  Proactive Alert Subsystem & Cooldown Dispatch
                 </h3>
               </div>
               <span style={{ fontSize: "11px", color: "#64748b" }}>60-min Cooldown + Escalation Override</span>
             </div>
+
 
             <p style={{ fontSize: "13px", color: "#64748b", margin: "0 0 16px 0" }}>
               Dispatches multi-channel alerts (RFC 8058 compliant email + glanceable WhatsApp) when risk is High or Critical, while preventing alert fatigue through the Double Throttle state machine.

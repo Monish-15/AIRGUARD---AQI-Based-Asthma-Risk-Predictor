@@ -113,7 +113,9 @@ export default function InsightsPage() {
             <AlertCircle size={15} color="#d97706" />
             <span style={{ fontSize: "14px", fontWeight: 700, color: "#0f172a" }}>Attack Time Distribution</span>
           </div>
-          <ResponsiveContainer width="100%" height={160}>
+          <ResponsiveContainer width="100%" height={160} minWidth={0}>
+
+
             <BarChart data={hourData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
               <XAxis dataKey="time" tick={{ fontSize: 11, fill: "#94a3b8" }} />
               <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} />

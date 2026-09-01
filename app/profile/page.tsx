@@ -311,8 +311,9 @@ export default function ProfilePage() {
         <Card>
           <CardHeader icon={<Bell size={15} color="#2563eb" />} title="Proactive Health Alerts" />
           <p style={{ fontSize: "12px", color: "#64748b", marginTop: "-12px", marginBottom: "18px" }}>
-            AirGuard monitors live environmental telemetry 24/7. When risk reaches High or Critical levels, alerts are automatically dispatched to your contact channels (governed by the paper's Double Throttle cooldown policy).
+            AirGuard monitors live environmental telemetry 24/7. When risk reaches High or Critical levels, alerts are automatically dispatched to your contact channels with an intelligent alert cooldown policy to prevent notification fatigue.
           </p>
+
 
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             {/* Email Notifications Toggle */}

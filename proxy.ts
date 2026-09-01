@@ -93,14 +93,7 @@ export function proxy(request: NextRequest) {
     return applySecurityHeaders(errRes);
   }
 
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set("x-ratelimit-applied", "1");
-
-  const response = NextResponse.next({
-    request: {
-      headers: requestHeaders,
-    },
-  });
+  const response = NextResponse.next();
 
   // Attach rate limit headers and security headers
   for (const [key, value] of Object.entries(rateHeaders)) {
@@ -112,3 +105,4 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: ["/api/:path*"],
 };
+

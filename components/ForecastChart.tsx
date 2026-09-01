@@ -41,8 +41,11 @@ export default function ForecastChart({ data }: { data: ForecastPoint[] }) {
                     <span style={{ color: "#0891b2" }}>● AQI</span>
                     <span style={{ color: "#7c3aed" }}>● PM2.5</span>
                 </div>
+
             </div>
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={200} minWidth={0}>
+
+
                 <AreaChart data={data} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
                     <defs>
                         <linearGradient id="aqi-grad" x1="0" y1="0" x2="0" y2="1">

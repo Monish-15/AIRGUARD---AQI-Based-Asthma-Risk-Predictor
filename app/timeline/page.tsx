@@ -79,8 +79,11 @@ export default function TimelinePage() {
             <span style={{ color: "#0891b2" }}>● AQI Level</span>
             <span style={{ color: "#dc2626" }}>- - Risk Score (%)</span>
           </div>
+
         </div>
-        <ResponsiveContainer width="100%" height={240}>
+        <ResponsiveContainer width="100%" height={240} minWidth={0}>
+
+
           <LineChart data={timelineData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
             <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#94a3b8" }} interval={4} />
